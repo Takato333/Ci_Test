@@ -1,16 +1,6 @@
 package com.example.demo;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Step;
-
-import io.qameta.allure.junitplatform.AllureJunitPlatform;
-import org.junit.jupiter.api.extension.ExtendWith;
-import com.example.demo.service.AuthenticationService;
-import com.example.demo.model.LoginRequest;
-import com.example.demo.model.AccountResponse;
 import com.example.demo.exception.EntityNotFoundException;
-import com.example.demo.repository.AccountRepository;
-import com.example.demo.entity.Account;
 import io.qameta.allure.*;
 import io.qameta.allure.junitplatform.AllureJunitPlatform;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,18 +8,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.modelmapper.ModelMapper;
+import com.example.demo.service.AuthenticationService;
+import com.example.demo.model.LoginRequest;
+import com.example.demo.model.AccountResponse;
+import com.example.demo.entity.Account;
+import com.example.demo.repository.AccountRepository;
 import com.example.demo.service.TokenService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 @Epic("Authentication Service Tests")
 @Feature("Login Tests")
 class DemoApplicationTests {
@@ -54,10 +48,14 @@ class DemoApplicationTests {
 
 	@BeforeEach
 	void setUp() {
-		// Any additional setup can be done here
-		ModelMapper realModelMapper = new ModelMapper();
-		when(modelMapper.map(any(Account.class), eq(AccountResponse.class)))
-				.thenAnswer(invocation -> realModelMapper.map(invocation.getArgument(0), AccountResponse.class));
+		// Use lenient stubbing to avoid UnnecessaryStubbingException
+		lenient().when(modelMapper.map(any(Account.class), eq(AccountResponse.class)))
+				.thenAnswer(invocation -> {
+					Account account = invocation.getArgument(0);
+					AccountResponse response = new AccountResponse();
+					response.setPhone(account.getPhone());
+					return response;
+				});
 	}
 
 	@Test
@@ -86,11 +84,8 @@ class DemoApplicationTests {
 		// Act
 		AccountResponse result = authenticationService.login(loginRequest);
 
-		// Debug
-		System.out.println("Authentication result: " + authentication);
-		System.out.println("Account from authentication: " + authentication.getPrincipal());
-		System.out.println("Mapped response: " + expectedResponse);
-		System.out.println("Actual result: " + result);
+		// Debug log
+		logAuthenticationResult(authentication, account, expectedResponse, result);
 
 		// Assert
 		assertNotNull(result);
@@ -109,7 +104,6 @@ class DemoApplicationTests {
 		loginRequest.setPhone("1234567890");
 		loginRequest.setPassword("wrongpassword");
 
-
 		when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
 				.thenThrow(new RuntimeException("Authentication failed"));
 
@@ -118,8 +112,6 @@ class DemoApplicationTests {
 			authenticationService.login(loginRequest);
 		});
 		verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
-		System.out.println("Authentication result: " + authentication);
-		System.out.println("Account from authentication: " + authentication.getPrincipal());
 	}
 
 	@Test
